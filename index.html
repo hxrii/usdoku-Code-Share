@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CODE</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #FFE500;
+    --border: 5px solid #000;
+    --shadow: 8px 8px 0px #000;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    transition: background-color 0.25s cubic-bezier(.17,.67,.83,.67);
+    user-select: none;
+    position: relative;
+  }
+
+  /* Brutal grid overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: #000;
+    background: #fff;
+    border: var(--border);
+    padding: 8px 24px;
+    border-bottom: none;
+    position: relative;
+    left: 0;
+    align-self: flex-start;
+  }
+
+  .code-box {
+    border: var(--border);
+    box-shadow: var(--shadow);
+    background: #fff;
+    padding: 40px 60px;
+    position: relative;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Each digit cell */
+  .digit-cell {
+    position: relative;
+    width: 140px;
+    height: 200px;
+    border: var(--border);
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .digit-cell::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--bg);
+    transition: background-color 0.25s;
+  }
+
+  .digit-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 160px;
+    line-height: 1;
+    color: #fff;
+    position: relative;
+    transition: none;
+  }
+
+  /* Animations */
+  @keyframes slam {
+    0% { transform: scale(1.6) translateY(-20px); opacity: 0; }
+    60% { transform: scale(0.92) translateY(4px); opacity: 1; }
+    80% { transform: scale(1.04) translateY(-2px); }
+    100% { transform: scale(1) translateY(0); }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-8px) rotate(-2deg); }
+    40% { transform: translateX(8px) rotate(2deg); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+  @keyframes glitch {
+    0% { clip-path: inset(0 0 100% 0); transform: translateX(0); }
+    10% { clip-path: inset(10% 0 60% 0); transform: translateX(-4px); }
+    20% { clip-path: inset(40% 0 20% 0); transform: translateX(4px); }
+    30% { clip-path: inset(0 0 0 0); transform: translateX(0); }
+    100% { clip-path: inset(0 0 0 0); transform: translateX(0); }
+  }
+  @keyframes scanline {
+    0% { top: -20px; }
+    100% { top: 110%; }
+  }
+  @keyframes pop-in {
+    0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+    70% { transform: scale(1.1) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+  }
+  @keyframes bg-flash {
+    0% { opacity: 0.5; }
+    100% { opacity: 0; }
+  }
+
+  .digit-display.animate-slam {
+    animation: slam 0.35s cubic-bezier(.17,.67,.83,.67) forwards;
+  }
+  .digit-display.animate-shake {
+    animation: shake 0.4s ease forwards;
+  }
+
+  /* Scanline effect on change */
+  .scanline {
+    position: absolute;
+    left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, rgba(255,255,255,0.18), transparent);
+    pointer-events: none;
+    animation: scanline 0.6s linear forwards;
+    z-index: 3;
+  }
+
+  /* Flash overlay on bg change */
+  .flash-overlay {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 999;
+  }
+  .flash-overlay.flash {
+    animation: bg-flash 0.3s ease-out forwards;
+  }
+
+  /* Hidden input for actual typing */
+  #code-input {
+    position: fixed;
+    opacity: 0;
+    pointer-events: none;
+    width: 1px; height: 1px;
+    top: -9999px;
+  }
+
+  /* Click-to-edit hint */
+  .hint {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #000;
+    background: var(--bg);
+    border: var(--border);
+    box-shadow: 4px 4px 0 #000;
+    padding: 10px 20px;
+    margin-top: 28px;
+    transition: background-color 0.25s;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .hint:hover {
+    background: #000;
+    color: #fff;
+  }
+
+  .code-box.focused {
+    box-shadow: 12px 12px 0px #000, 0 0 0 4px rgba(0,0,0,0.2);
+  }
+
+  /* Active digit indicator */
+  .digit-cell.active::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 4px solid var(--bg);
+    z-index: 2;
+    pointer-events: none;
+    transition: border-color 0.25s;
+  }
+
+  /* Cursor blink inside active cell */
+  .digit-cell.active .digit-display::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 140px;
+    background: var(--bg);
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: blink 0.8s step-end infinite;
+    transition: background-color 0.25s;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .live-dot {
+    width: 10px; height: 10px;
+    background: #00c853;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    border: 2px solid #000;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,200,83,0.5); }
+    50% { transform: scale(1.2); box-shadow: 0 0 0 6px rgba(0,200,83,0); }
+  }
+
+  .status-bar {
+    position: fixed;
+    top: 20px; right: 20px;
+    background: #000;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    padding: 8px 16px;
+    border: 3px solid #000;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .corner-stamp {
+    position: fixed;
+    bottom: 20px; left: 20px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.3em;
+    color: rgba(0,0,0,0.25);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="flash-overlay" id="flash"></div>
+
+<div class="status-bar">
+  <span class="live-dot"></span>
+  LIVE · REALTIME
+</div>
+
+<div class="corner-stamp">SHARED CODE</div>
+
+<div class="container">
+  <div class="label">ENTER CODE</div>
+  <div class="code-box" id="code-box">
+    <div class="digit-cell" id="cell-0"><span class="digit-display" id="d0">0</span></div>
+    <div class="digit-cell" id="cell-1"><span class="digit-display" id="d1">0</span></div>
+    <div class="digit-cell" id="cell-2"><span class="digit-display" id="d2">0</span></div>
+    <div class="digit-cell" id="cell-3"><span class="digit-display" id="d3">0</span></div>
+  </div>
+  <div class="hint" id="hint-btn">▸ CLICK TO EDIT</div>
+</div>
+
+<input type="text" id="code-input" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
+
+<script>
+  const WS_URL = `ws://${location.host}`;
+  const codeInput = document.getElementById('code-input');
+  const codeBox = document.getElementById('code-box');
+  const hintBtn = document.getElementById('hint-btn');
+  const flash = document.getElementById('flash');
+  const digits = [
+    document.getElementById('d0'),
+    document.getElementById('d1'),
+    document.getElementById('d2'),
+    document.getElementById('d3'),
+  ];
+  const cells = [
+    document.getElementById('cell-0'),
+    document.getElementById('cell-1'),
+    document.getElementById('cell-2'),
+    document.getElementById('cell-3'),
+  ];
+
+  let ws;
+  let currentCode = '0000';
+  let isFocused = false;
+  let cursorPos = 0;
+
+  // ---- WebSocket ----
+  function connect() {
+    ws = new WebSocket(WS_URL);
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'init' || data.type === 'update') {
+        const wasCode = currentCode;
+        currentCode = data.code.padEnd(4, '_');
+        applyBg(data.bg);
+        if (data.type === 'update') {
+          animateCodeChange(wasCode, currentCode);
+          doFlash();
+        } else {
+          renderCode(currentCode);
+        }
+      }
+    };
+    ws.onclose = () => setTimeout(connect, 1000);
+    ws.onerror = () => ws.close();
+  }
+
+  function sendUpdate(code) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'update', code }));
+    }
+  }
+
+  // ---- BG ----
+  function applyBg(color) {
+    document.body.style.setProperty('--bg', color);
+    // Also update elements that use var(--bg) for smooth transitions
+    document.querySelectorAll('.digit-cell::after').forEach(el => {});
+  }
+
+  function doFlash() {
+    flash.classList.remove('flash');
+    void flash.offsetWidth;
+    flash.classList.add('flash');
+  }
+
+  // ---- Render ----
+  function renderCode(code) {
+    for (let i = 0; i < 4; i++) {
+      const ch = code[i];
+      digits[i].textContent = (ch && ch !== '_') ? ch : ' ';
+    }
+  }
+
+  function animateCodeChange(oldCode, newCode) {
+    for (let i = 0; i < 4; i++) {
+      if (oldCode[i] !== newCode[i]) {
+        const el = digits[i];
+        el.textContent = (newCode[i] && newCode[i] !== '_') ? newCode[i] : ' ';
+        el.classList.remove('animate-slam', 'animate-shake');
+        void el.offsetWidth;
+        el.classList.add('animate-slam');
+
+        // Add scanline to cell
+        const cell = cells[i];
+        const existing = cell.querySelector('.scanline');
+        if (existing) existing.remove();
+        const sl = document.createElement('div');
+        sl.className = 'scanline';
+        cell.appendChild(sl);
+        setTimeout(() => sl.remove(), 700);
+      } else {
+        digits[i].textContent = (newCode[i] && newCode[i] !== '_') ? newCode[i] : ' ';
+      }
+    }
+  }
+
+  // ---- Input Handling ----
+  function setFocus(focused) {
+    isFocused = focused;
+    codeBox.classList.toggle('focused', focused);
+    hintBtn.textContent = focused ? '▸ TYPING...' : '▸ CLICK TO EDIT';
+    if (focused) {
+      updateCursor(0);
+    } else {
+      cells.forEach(c => c.classList.remove('active'));
+    }
+  }
+
+  function updateCursor(pos) {
+    cursorPos = Math.max(0, Math.min(3, pos));
+    cells.forEach((c, i) => c.classList.toggle('active', i === cursorPos));
+  }
+
+  codeBox.addEventListener('click', () => {
+    codeInput.focus();
+    setFocus(true);
+    updateCursor(0);
+  });
+
+  hintBtn.addEventListener('click', () => {
+    codeInput.focus();
+    setFocus(true);
+    updateCursor(0);
+  });
+
+  codeInput.addEventListener('blur', () => setFocus(false));
+
+  // Handle keydown for digit entry
+  let typedCode = ['', '', '', ''];
+
+  function syncTyped() {
+    typedCode = currentCode.replace(/_/g, '').split('').slice(0, 4);
+    while (typedCode.length < 4) typedCode.push('');
+  }
+
+  codeInput.addEventListener('focus', () => {
+    syncTyped();
+    cursorPos = 0;
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!isFocused) return;
+
+    if (/^[a-zA-Z0-9]$/.test(e.key)) {
+      typedCode[cursorPos] = e.key.toUpperCase();
+      const code = typedCode.map(d => d || ' ').join('');
+      sendUpdate(code);
+      if (cursorPos < 3) updateCursor(cursorPos + 1);
+      e.preventDefault();
+    } else if (e.key === 'Backspace') {
+      if (typedCode[cursorPos]) {
+        typedCode[cursorPos] = '';
+      } else if (cursorPos > 0) {
+        updateCursor(cursorPos - 1);
+        typedCode[cursorPos] = '';
+      }
+      const code = typedCode.map(d => d || ' ').join('');
+      sendUpdate(code);
+      e.preventDefault();
+    } else if (e.key === 'ArrowLeft') {
+      updateCursor(cursorPos - 1);
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      updateCursor(cursorPos + 1);
+      e.preventDefault();
+    } else if (e.key === 'Escape') {
+      codeInput.blur();
+      setFocus(false);
+    }
+  });
+
+  // Click individual cells
+  cells.forEach((cell, i) => {
+    cell.addEventListener('click', (e) => {
+      e.stopPropagation();
+      codeInput.focus();
+      setFocus(true);
+      updateCursor(i);
+    });
+  });
+
+  connect();
+</script>
+</body>
+</html>
